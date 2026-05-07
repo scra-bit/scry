@@ -120,24 +120,29 @@ public final class GenerationEngine: @unchecked Sendable {
         maxTokens: Int = 4096,
         topP: Float = 0.9
     ) -> AsyncThrowingStream<GenerationEvent, Error> {
-        guard let session = session else {
+        guard session != nil else {
             return AsyncThrowingStream { $0.finish(throwing: ModelManagerError.modelNotLoaded) }
         }
 
-        // Update generation parameters
-        session.generateParameters.temperature = temperature
-        session.generateParameters.topP = topP
-        session.generateParameters.maxTokens = maxTokens
-
-        return AsyncThrowingStream { continuation in
+        return AsyncThrowingStream { [self] continuation in
             let task = Task {
+                guard let session = self.session else {
+                    continuation.finish(throwing: ModelManagerError.modelNotLoaded)
+                    return
+                }
+
+                // Update generation parameters
+                session.generateParameters.temperature = temperature
+                session.generateParameters.topP = topP
+                session.generateParameters.maxTokens = maxTokens
+
                 var promptTokens = 0
                 var genTokens = 0
                 var promptTime: Double = 0
                 var genTime: Double = 0
 
                 do {
-                    for try await event in session.streamDetails(to: prompt, images: [], videos: []) {
+                    for try await event in session.streamDetails(to: prompt) {
                         if Task.isCancelled { break }
                         switch event {
                         case .chunk(let text):
@@ -212,7 +217,7 @@ public final class GenerationEngine: @unchecked Sendable {
         var promptTime: Double = 0
         var genTime: Double = 0
 
-        for try await event in singleSession.streamDetails(to: prompt, images: [], videos: []) {
+        for try await event in singleSession.streamDetails(to: prompt) {
             switch event {
             case .chunk(let text):
                 fullText += text
@@ -270,7 +275,7 @@ public final class GenerationEngine: @unchecked Sendable {
                 .reduce(0) { $0 + $1.nbytes }
 
             // Track memory before and after a synthetic forward pass
-            let memBefore = MLX.GPU.activeMemory
+            let memBefore = MLX.GPU.Memory.activeMemory
 
             // Create a synthetic input
             let inputTokens = MLXArray(Array(repeating: Int32(1), count: measureTokenCount))
@@ -284,7 +289,7 @@ public final class GenerationEngine: @unchecked Sendable {
             let result = context.model(lmInput.text, cache: caches, state: nil)
             eval(result.logits)
 
-            let memAfter = MLX.GPU.activeMemory
+            let memAfter = MLX.GPU.Memory.activeMemory
             let totalAllocated = Int(memAfter) - Int(memBefore)
             let kvBytes = max(totalAllocated - weightBytes, 0)
 

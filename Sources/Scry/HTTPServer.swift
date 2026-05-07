@@ -394,9 +394,9 @@ public final class ScryServer: Sendable {
     func handleHealth(request: Request, context: BasicRequestContext) async throws -> Response {
         let health = await telemetry.healthSnapshot(
             modelID: modelID,
-            memoryUsed: Int(MLX.GPU.activeMemory),
+            memoryUsed: Int(MLX.GPU.Memory.activeMemory),
             memoryAvailable: engine.profile.maxRecommendedWorkingSetBytes,
-            mtpEnabled: engine.currentMetadata?.mtpVariant != .none
+            mtpEnabled: engine.currentMetadata.map { $0.mtpVariant != .none } ?? false
         )
         let data = try JSONEncoder().encode(health)
         return Response(

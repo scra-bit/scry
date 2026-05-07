@@ -111,7 +111,7 @@ public struct HardwareProfiler: Sendable {
         guard size > 0 else { return "Unknown" }
         var name = [CChar](repeating: 0, count: size)
         sysctlbyname("machdep.cpu.brand_string", &name, &size, nil, 0)
-        return String(cString: name)
+        return String(validatingCString: name) ?? "Unknown"
     }
 
     // MARK: - Chip Family Parsing

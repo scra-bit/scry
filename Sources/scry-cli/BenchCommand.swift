@@ -29,7 +29,7 @@ struct BenchCommand: AsyncParsableCommand {
         try await engine.setup(modelID: modelID, progressHandler: makeProgressHandler())
         print()
 
-        let hasMTP = engine.currentMetadata?.mtpVariant != .none
+        let hasMTP = engine.currentMetadata.map { $0.mtpVariant != .none } ?? false
 
         // Warmup run (JIT shader compilation, cache warming)
         print("Warming up...")
