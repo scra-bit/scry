@@ -2,6 +2,8 @@ import Foundation
 import MLX
 import MLXLLM
 import MLXLMCommon
+import MLXLMTokenizers
+import MLXLMHFAPI
 
 // MARK: - Model Metadata
 
@@ -101,26 +103,27 @@ public actor ModelManager {
             configuration = ModelConfiguration(id: modelID)
         }
 
-        // Load via factory (handles download, weight loading, tokenizer)
-        let container: ModelContainer
-        do {
-            container = try await LLMModelFactory.shared.loadContainer(
-                configuration: configuration
-            ) { progress in
-                progressHandler?(progress.fractionCompleted)
-            }
-        } catch {
-            // Fallback: try VLM factory for vision-language models
-            container = try await VLMModelFactory.shared.loadContainer(
-                configuration: configuration
+        // Download model files first so we can parse metadata
+        let hub = HubClient.default
+        let modelDirectory: URL
+        if modelID.hasPrefix("/") || modelID.hasPrefix("file://") {
+            modelDirectory = URL(fileURLWithPath: modelID)
+        } else {
+            modelDirectory = try await hub.download(
+                id: modelID,
+                revision: nil,
+                matching: ["*.safetensors", "*.json", "*.jinja"],
+                useLatest: false
             ) { progress in
                 progressHandler?(progress.fractionCompleted)
             }
         }
 
         // Parse config.json for metadata the factory doesn't expose
-        let modelDirectory = configuration.modelDirectory(hub: HubApi())
         let metadata = try parseMetadata(from: modelDirectory)
+
+        // Load via factory (handles weight loading, tokenizer)
+        let container = try await loadModelContainer(from: modelDirectory)
 
         let loadTime = CFAbsoluteTimeGetCurrent() - start
 
@@ -140,7 +143,7 @@ public actor ModelManager {
     public func unload() {
         currentModel = nil
         // Release MLX's internal cache to free pages promptly
-        MLX.GPU.clearCache()
+        MLX.Memory.clearCache()
     }
 
     // MARK: - Pre-flight Check
