@@ -94,36 +94,36 @@ public actor ModelManager {
 
         let start = CFAbsoluteTimeGetCurrent()
 
-        // Resolve configuration
-        let configuration: ModelConfiguration
-        if modelID.hasPrefix("/") || modelID.hasPrefix("file://") {
-            let url = URL(fileURLWithPath: modelID)
-            configuration = ModelConfiguration(directory: url)
-        } else {
-            configuration = ModelConfiguration(id: modelID)
-        }
-
-        // Download model files first so we can parse metadata
-        let hub = HubClient.default
         let modelDirectory: URL
-        if modelID.hasPrefix("/") || modelID.hasPrefix("file://") {
-            modelDirectory = URL(fileURLWithPath: modelID)
+        let container: ModelContainer
+
+        if let localDirectory = Self.localModelDirectory(for: modelID) {
+            modelDirectory = localDirectory
+            container = try await loadModelContainer(from: localDirectory)
         } else {
+            let hub = HubClient.default
+            let progress: @Sendable (Progress) -> Void = { value in
+                progressHandler?(value.fractionCompleted)
+            }
+
             modelDirectory = try await hub.download(
                 id: modelID,
-                revision: nil,
+                revision: "main",
                 matching: ["*.safetensors", "*.json", "*.jinja"],
-                useLatest: false
-            ) { progress in
-                progressHandler?(progress.fractionCompleted)
-            }
+                useLatest: false,
+                progressHandler: progress
+            )
+            container = try await loadModelContainer(
+                from: hub,
+                id: modelID,
+                revision: "main",
+                useLatest: false,
+                progressHandler: progress
+            )
         }
 
         // Parse config.json for metadata the factory doesn't expose
         let metadata = try parseMetadata(from: modelDirectory)
-
-        // Load via factory (handles weight loading, tokenizer)
-        let container = try await loadModelContainer(from: modelDirectory)
 
         let loadTime = CFAbsoluteTimeGetCurrent() - start
 
@@ -237,6 +237,18 @@ public actor ModelManager {
             .appendingPathComponent(".cache/huggingface/hub")
             .appendingPathComponent(safeName)
         try FileManager.default.removeItem(at: cacheDir)
+    }
+
+    // MARK: - Path Resolution
+
+    private static func localModelDirectory(for modelID: String) -> URL? {
+        if modelID.hasPrefix("file://") {
+            return URL(string: modelID)?.standardizedFileURL
+        }
+        if modelID.hasPrefix("/") {
+            return URL(fileURLWithPath: modelID).standardizedFileURL
+        }
+        return nil
     }
 
     // MARK: - Metadata Parsing

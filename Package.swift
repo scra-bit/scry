@@ -7,7 +7,7 @@ let package = Package(
     platforms: [.macOS(.v15), .iOS(.v18)],
     products: [
         .library(name: "Scry", targets: ["Scry"]),
-        .executable(name: "scry", targets: ["scry-cli"]),
+        .executable(name: "scry-cli", targets: ["ScryCLI"]),
     ],
     dependencies: [
         .package(url: "https://github.com/ml-explore/mlx-swift", from: "0.31.3"),
@@ -29,13 +29,32 @@ let package = Package(
                 .product(name: "MLXLMTokenizers", package: "swift-tokenizers-mlx"),
                 .product(name: "MLXLMHFAPI", package: "swift-hf-api-mlx"),
                 .product(name: "Hummingbird", package: "hummingbird"),
+            ],
+            path: "Sources/Scry",
+            sources: [
+                "GenerationEngine.swift",
+                "HTTPServer.swift",
+                "HardwareProfiler.swift",
+                "MTPEngine.swift",
+                "MemoryController.swift",
+                "ModelManager.swift",
+                "Telemetry.swift",
             ]
         ),
         .executableTarget(
-            name: "scry-cli",
+            name: "ScryCLI",
             dependencies: [
                 "Scry",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            path: "Sources/scry-cli",
+            sources: [
+                "BenchCommand.swift",
+                "ChatCommand.swift",
+                "CLI.swift",
+                "PullCommand.swift",
+                "RunCommand.swift",
+                "ServeCommand.swift",
             ]
         ),
     ]

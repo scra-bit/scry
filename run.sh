@@ -1,31 +1,56 @@
 #!/bin/bash
-# run.sh — build and run via xcodebuild (Metal shaders can't compile via swift build)
-set -e
-SCHEME="scry-cli"
+# run.sh — run the MLX CLI from the most recent Xcode/MCP build products.
+#
+# `mlx-swift` requires compiled Metal shader resources at runtime. In this repo,
+# the supported path is to build through Xcode (or the Xcode MCP), then run the
+# resulting product from DerivedData with `DYLD_FRAMEWORK_PATH` pointed at the
+# build products directory.
+set -euo pipefail
 
-echo "Building $SCHEME..."
-xcodebuild build \
-  -scheme "$SCHEME" \
-  -destination 'platform=macOS,arch=arm64' \
-  -skipMacroValidation \
-  -quiet 2>&1 | tail -5
+PRODUCT="scry-cli"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DERIVED_DATA_ROOT="${XCODE_DERIVED_DATA_ROOT:-$HOME/Library/Developer/Xcode/DerivedData}"
 
-# Find the binary — use -showBuildSettings and handle the path robustly
-BUILD_DIR=$(xcodebuild -scheme "$SCHEME" -showBuildSettings 2>/dev/null \
-  | grep ' BUILT_PRODUCTS_DIR' | head -1 | sed 's/.*= //')
+find_latest_build_dir() {
+  find "$DERIVED_DATA_ROOT" -path "*/Build/Products/Debug/$PRODUCT" -type f -print 2>/dev/null \
+    | while IFS= read -r binary; do
+        stat -f "%m %N" "$binary"
+      done \
+    | sort -nr \
+    | sed -n '1s/^[0-9]* //p' \
+    | xargs -I{} dirname "{}"
+}
 
+BUILD_DIR="${XCODE_PRODUCTS_DIR:-}"
 if [ -z "$BUILD_DIR" ]; then
-  # Fallback: search DerivedData
-  BUILD_DIR=$(find ~/Library/Developer/Xcode/DerivedData/scry-*/Build/Products/Debug -maxdepth 0 2>/dev/null | head -1)
+  BUILD_DIR="$(find_latest_build_dir || true)"
 fi
 
-BINARY="$BUILD_DIR/$SCHEME"
+if [ -z "$BUILD_DIR" ]; then
+  cat <<'EOF'
+Error: no Xcode-built scry-cli binary was found.
 
-if [ ! -f "$BINARY" ]; then
-  echo "Error: Could not find built binary at $BINARY"
-  echo "Try: xcodebuild -scheme $SCHEME -showBuildSettings | grep BUILT_PRODUCTS_DIR"
+Build the package first in one of these ways:
+  - Xcode UI: build the `scry-Package` scheme for `My Mac`
+  - Codex/Xcode MCP: run the project build from the active Xcode window
+
+Then rerun:
+  ./run.sh <args>
+EOF
   exit 1
 fi
 
-echo "Running: $BINARY $@"
-exec "$BINARY" "$@"
+if [ ! -x "$BUILD_DIR/$PRODUCT" ]; then
+  echo "Error: expected executable at $BUILD_DIR/$PRODUCT"
+  exit 1
+fi
+
+if [ ! -d "$BUILD_DIR/mlx-swift_Cmlx.bundle" ]; then
+  echo "Error: missing MLX resource bundle at $BUILD_DIR/mlx-swift_Cmlx.bundle"
+  echo "Rebuild the package through Xcode UI or Xcode MCP, then rerun this script."
+  exit 1
+fi
+
+echo "Running Xcode-built binary: $BUILD_DIR/$PRODUCT $*"
+export DYLD_FRAMEWORK_PATH="$BUILD_DIR${DYLD_FRAMEWORK_PATH:+:$DYLD_FRAMEWORK_PATH}"
+exec "$BUILD_DIR/$PRODUCT" "$@"
