@@ -16,12 +16,12 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_16.3.app || sudo xcode-select -s /Applications/Xcode.app
 
       - name: Resolve packages
-        run: xcodebuild -resolvePackageDependencies -scheme scry-cli -destination 'platform=macOS,arch=arm64'
+        run: xcodebuild -resolvePackageDependencies -scheme scry -destination 'platform=macOS,arch=arm64'
 
       - name: Build
         run: |
           xcodebuild build \
-            -scheme scry-cli \
+            -scheme scry \
             -destination 'platform=macOS,arch=arm64' \
             -skipMacroValidation \
             2>&1 | tail -50
@@ -29,10 +29,10 @@ jobs:
       - name: Locate binary
         id: binary
         run: |
-          BUILD_DIR=$(xcodebuild -scheme scry-cli -showBuildSettings 2>/dev/null \
+          BUILD_DIR=$(xcodebuild -scheme scry -showBuildSettings 2>/dev/null \
             | grep ' BUILT_PRODUCTS_DIR' | head -1 | sed 's/.*= //')
-          echo "path=$BUILD_DIR/scry-cli" >> "$GITHUB_OUTPUT"
-          ls -la "$BUILD_DIR/scry-cli"
+          echo "path=$BUILD_DIR/scry" >> "$GITHUB_OUTPUT"
+          ls -la "$BUILD_DIR/scry"
 
       - name: Smoke test
         run: |
