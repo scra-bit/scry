@@ -142,7 +142,7 @@ public final class GenerationEngine: @unchecked Sendable {
                 var genTime: Double = 0
 
                 do {
-                    for try await event in session.streamDetails(to: prompt) {
+                    for try await event in session.streamDetails(to: prompt, images: [], videos: []) {
                         if Task.isCancelled { break }
                         switch event {
                         case .chunk(let text):
@@ -217,7 +217,7 @@ public final class GenerationEngine: @unchecked Sendable {
         var promptTime: Double = 0
         var genTime: Double = 0
 
-        for try await event in singleSession.streamDetails(to: prompt) {
+        for try await event in singleSession.streamDetails(to: prompt, images: [], videos: []) {
             switch event {
             case .chunk(let text):
                 fullText += text
