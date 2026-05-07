@@ -141,7 +141,7 @@ public final class MemoryController: Sendable {
 
     /// Check current memory pressure level.
     public func currentPressureLevel() -> MemoryPressureLevel {
-        let active = Memory.activeMemory
+        let active = MLX.Memory.activeMemory
         let maxRecommended = profile.maxRecommendedWorkingSetBytes
         let headroom = maxRecommended - Int(active)
 

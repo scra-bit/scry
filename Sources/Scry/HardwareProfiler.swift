@@ -111,7 +111,9 @@ public struct HardwareProfiler: Sendable {
         guard size > 0 else { return "Unknown" }
         var name = [CChar](repeating: 0, count: size)
         sysctlbyname("machdep.cpu.brand_string", &name, &size, nil, 0)
-        return String(validatingCString: name) ?? "Unknown"
+        // Truncate at null terminator, then validate as UTF-8
+        let truncated = name.prefix(while: { $0 != 0 }).map { UInt8(bitPattern: $0) }
+        return String(validating: truncated, as: UTF8.self) ?? "Unknown"
     }
 
     // MARK: - Chip Family Parsing

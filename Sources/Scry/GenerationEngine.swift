@@ -275,7 +275,7 @@ public final class GenerationEngine: @unchecked Sendable {
                 .reduce(0) { $0 + $1.nbytes }
 
             // Track memory before and after a synthetic forward pass
-            let memBefore = Memory.activeMemory
+            let memBefore = MLX.Memory.activeMemory
 
             // Create a synthetic input
             let inputTokens = MLXArray(Array(repeating: Int32(1), count: measureTokenCount))
@@ -289,7 +289,7 @@ public final class GenerationEngine: @unchecked Sendable {
             let result = context.model(lmInput.text, cache: caches, state: nil)
             eval(result.logits)
 
-            let memAfter = Memory.activeMemory
+            let memAfter = MLX.Memory.activeMemory
             let totalAllocated = Int(memAfter) - Int(memBefore)
             let kvBytes = max(totalAllocated - weightBytes, 0)
 

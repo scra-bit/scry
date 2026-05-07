@@ -20,11 +20,12 @@ jobs:
 
       - name: Build
         run: |
+          set -o pipefail
           xcodebuild build \
             -scheme scry \
             -destination 'platform=macOS,arch=arm64' \
             -skipMacroValidation \
-            2>&1 | tail -50
+            2>&1 | tail -200
 
       - name: Locate binary
         id: binary
